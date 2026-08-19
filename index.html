@@ -1,32 +1,18 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CozyOS</title><style>
-body{margin:0;background:#F8F5F1;font-family:Inter,Arial,sans-serif;color:#2D2926}
-#app{max-width:900px;margin:auto;padding:24px}.card{background:#fff;border-radius:18px;padding:18px;margin:16px 0;box-shadow:0 6px 20px rgba(0,0,0,.06)}
-button{background:#8C735C;color:#fff;border:none;border-radius:12px;padding:10px 16px;cursor:pointer}
-input{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;margin:8px 0}
-.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.badge{padding:4px 10px;border-radius:999px;background:#eee}
-.used{background:#cfe8cf}.clip{border:1px solid #eee;border-radius:12px;padding:10px;margin:8px 0}
-</style></head><body><div id="app"></div>
-<script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import{getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import{getFirestore,collection,addDoc,onSnapshot,query,orderBy,doc,setDoc}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-const app=initializeApp({apiKey:"AIzaSyB55uNeHcx2xYSlqPIjmMQgXpfgQg5bomk",authDomain:"nikitascozyproject.firebaseapp.com",projectId:"nikitascozyproject",storageBucket:"nikitascozyproject.firebasestorage.app",messagingSenderId:"812688468987",appId:"1:812688468987:web:5cacd5d614773b69fbf95e"});
-const auth=getAuth(app),db=getFirestore(app),el=document.getElementById("app");
-const tracks=["Morning Light","Soft Breeze","Cozy Corners","Little Moments","Quiet Afternoon","Gentle Rain","Slow Sunday","Tiny Lanterns","Peaceful Steps","Home Glow"];
-onAuthStateChanged(auth,u=>u?home(u):login());
-function login(){el.innerHTML=`<div class=card><h1>☁️ CozyOS</h1><input id=e placeholder=Email><input id=p type=password placeholder=Password><div class=row><button id=su>Create Account</button><button id=li>Log In</button></div></div>`;
-su.onclick=()=>createUserWithEmailAndPassword(auth,e.value,p.value).catch(x=>alert(x.message));
-li.onclick=()=>signInWithEmailAndPassword(auth,e.value,p.value).catch(x=>alert(x.message));}
-function home(u){el.innerHTML=`<div class=card><div class=row><div><h2>Good evening</h2><small>${u.email}</small></div><button id=lo>Logout</button></div></div>
-<div class=card><h3>New Session</h3><input id=g placeholder="Game name"><button id=ns>Create Session</button></div>
-<div class=card><h3>Sessions</h3><div id=s></div></div>
-<div class=card><h3>Music Vault</h3><div id=m></div></div>`;lo.onclick=()=>signOut(auth);
-const used=new Set(JSON.parse(localStorage.getItem("used")||"[]"));const m=document.getElementById("m");
-function renderMusic(){m.innerHTML="";tracks.forEach(t=>{const d=document.createElement("div");d.className="row clip";d.innerHTML=`<span>${t}</span>`;const b=document.createElement("button");const f=used.has(t);b.textContent=f?"Used":"Unused";b.className=f?"used":"";b.onclick=()=>{f?used.delete(t):used.add(t);localStorage.setItem("used",JSON.stringify([...used]));renderMusic()};d.appendChild(b);m.appendChild(d);});}renderMusic();
-ns.onclick=async()=>{if(!g.value)return;await addDoc(collection(db,"users",u.uid,"sessions"),{game:g.value,date:new Date().toLocaleDateString(),created:Date.now(),clips:[]});g.value=""};
-const q=query(collection(db,"users",u.uid,"sessions"),orderBy("created","desc"));
-onSnapshot(q,snap=>{s.innerHTML="";snap.docs.forEach(x=>{const data=x.data();const c=document.createElement("div");c.className="clip";c.innerHTML=`<div class=row><strong>${data.game}</strong><span>${data.date}</span></div><input type=file accept="video/*" id="f${x.id}"><div class=row><button id="g${x.id}">Generate 30s Clips</button></div><div id="q${x.id}"></div>`;s.appendChild(c);document.getElementById("g"+x.id).onclick=async()=>{const f=document.getElementById("f"+x.id).files[0];if(!f)return alert("Choose a video.");const v=document.createElement("video");v.src=URL.createObjectURL(f);v.onloadedmetadata=async()=>{const clips=[];for(let t=0;t<v.duration;t+=30)clips.push({name:`clip_${String(clips.length+1).padStart(2,"0")}.mp4`,yt:false,ig:false,start:t,end:Math.min(t+30,v.duration)});await setDoc(doc(db,"users",u.uid,"sessions",x.id),{...data,clips},{merge:true});};};
-const unsub=onSnapshot(doc(db,"users",u.uid,"sessions",x.id),d=>{const cur=d.data();const box=document.getElementById("q"+x.id);box.innerHTML="";(cur.clips||[]).forEach(async(cl,i)=>{const r=document.createElement("div");r.className="row clip";r.innerHTML=`<span>${cl.name}</span>`;const a=document.createElement("div");const y=document.createElement("button"),ig=document.createElement("button"),dl=document.createElement("button");y.textContent=cl.yt?"Uploaded":"YouTube";ig.textContent=cl.ig?"Uploaded":"Instagram";dl.textContent="Download";y.onclick=async()=>{cur.clips[i].yt=!cur.clips[i].yt;await setDoc(doc(db,"users",u.uid,"sessions",x.id),{clips:cur.clips},{merge:true})};ig.onclick=async()=>{cur.clips[i].ig=!cur.clips[i].ig;await setDoc(doc(db,"users",u.uid,"sessions",x.id),{clips:cur.clips},{merge:true})};dl.onclick=()=>alert("Real MP4 export is the next module.");a.append(y,ig,dl);r.appendChild(a);box.appendChild(r);});});});});}
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CozyOS</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div id="app"></div>
+
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
