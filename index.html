@@ -1,376 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CozyOS Lite</title>
-
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CozyOS Lite v1.2</title>
 <style>
-:root{
-  --bg:#f8f5f1;
-  --card:#fffdf9;
-  --text:#2d2926;
-  --brown:#8c735c;
-  --sage:#6e9a73;
-  --line:#e8dfd5;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  font-family:system-ui,-apple-system,sans-serif;
-  background:var(--bg);
-  color:var(--text);
-}
-.wrap{
-  max-width:900px;
-  margin:auto;
-  padding:24px;
-}
-.card{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:22px;
-  padding:20px;
-  margin-bottom:18px;
-  box-shadow:0 8px 24px rgba(0,0,0,.05);
-}
-.row{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  flex-wrap:wrap;
-}
-button{
-  background:var(--brown);
-  color:white;
-  border:0;
-  border-radius:12px;
-  padding:10px 16px;
-  cursor:pointer;
-  font-weight:600;
-}
-button.alt{background:#ececec;color:#333}
-button.green{background:var(--sage)}
-input,select{
-  width:100%;
-  padding:12px;
-  border-radius:12px;
-  border:1px solid var(--line);
-  margin:8px 0;
-}
-.session,.track,.clip{
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:14px;
-  margin-top:12px;
-  background:white;
-}
-.small{font-size:13px;color:#777}
-.pill{
-  background:#f2ece5;
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:12px;
-}
-</style>
-</head>
+:root{--bg:#f8f5f1;--card:#fffdf9;--text:#2d2926;--brown:#8c735c;--sage:#6e9a73;--line:#e8dfd5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui;color:var(--text)}
+.wrap{max-width:920px;margin:auto;padding:24px}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;margin-bottom:18px;box-shadow:0 8px 24px rgba(0,0,0,.05)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+button{background:var(--brown);color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:600;cursor:pointer}
+button.alt{background:#ececec;color:#333}button.green{background:var(--sage)}
+input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);margin:8px 0}
+.session,.track,.clip{border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;background:#fff}
+.small{font-size:13px;color:#777}.pill{background:#f2ece5;padding:6px 10px;border-radius:999px;font-size:12px}
+.progress{height:10px;background:#eee;border-radius:999px;overflow:hidden}.fill{height:100%;width:0;background:var(--sage);transition:.2s}
+</style></head>
+<body><div class="wrap">
+<div class="card"><div class="row"><div><h1>☁️ CozyOS Lite v1.2</h1><div class="small">The Clip Factory</div></div><div class="pill" id="stats">0 sessions</div></div></div>
+<div class="card"><h2>🎮 New Session</h2><input id="game" placeholder="Game name"><button id="newSession">Start Session</button></div>
+<div class="card"><div class="row"><h2>📚 Sessions</h2><span class="small">Auto-saved</span></div><div id="sessions"></div></div>
+<div class="card"><div class="row"><h2>🎵 Music Vault</h2><button class="alt" id="shuffle">Random Pick</button></div><div id="music"></div></div>
+<div class="card"><h2>✍️ Caption Bank</h2><div id="captions"></div></div></div>
+<script type="module">
+import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js";
+import { fetchFile } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js";
+const ffmpeg=new FFmpeg(); let loaded=false;
+async function loadFF(){ if(!loaded){ await ffmpeg.load({coreURL:"https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js"}); loaded=true; } }
 
-<body>
-
-<div class="wrap">
-
-<div class="card">
-  <div class="row">
-    <div>
-      <h1>☁️ CozyOS Lite</h1>
-      <div class="small">One file. No bullshit.</div>
-    </div>
-    <div class="pill" id="stats">0 sessions</div>
-  </div>
-</div>
-
-<div class="card">
-  <h2>🎮 New Session</h2>
-  <input id="game" placeholder="Game name (Good Pizza Great Pizza)">
-  <button id="newSession">Start Session</button>
-</div>
-
-<div class="card">
-  <div class="row">
-    <h2>📚 Sessions</h2>
-    <span class="small">Auto-saved</span>
-  </div>
-  <div id="sessions"></div>
-</div>
-
-<div class="card">
-  <div class="row">
-    <h2>🎵 Music Vault</h2>
-    <button class="alt" id="shuffle">Random Pick</button>
-  </div>
-  <div id="music"></div>
-</div>
-
-<div class="card">
-  <h2>✍️ Caption Bank</h2>
-  <div id="captions"></div>
-</div>
-
-</div>
-
-<script>
 const MUSIC=[
-{title:"Cylinder Five",artist:"Chris Zabriskie",time:"0:42–1:22",link:"https://www.youtube.com/results?search_query=Chris+Zabriskie+Cylinder+Five"},
-{title:"Night Snow",artist:"Asher Fulero",time:"0:14–0:54",link:"https://www.youtube.com/results?search_query=Asher+Fulero+Night+Snow"},
-{title:"Morning Mandolin",artist:"Chris Haugen",time:"0:20–1:00",link:"https://www.youtube.com/results?search_query=Chris+Haugen+Morning+Mandolin"},
-{title:"Quiet Time",artist:"Aaron Kenny",time:"0:08–0:48",link:"https://www.youtube.com/results?search_query=Aaron+Kenny+Quiet+Time"},
-{title:"Fresh Fallen Snow",artist:"Chris Haugen",time:"0:35–1:15",link:"https://www.youtube.com/results?search_query=Chris+Haugen+Fresh+Fallen+Snow"},
-{title:"Cottagecore Piano",artist:"Ambient Mix",time:"0:12–0:52",link:"https://www.youtube.com/results?search_query=Cottagecore+Piano"}
+{t:"Cylinder Five",a:"Chris Zabriskie",ts:"0:42–1:22",u:"https://www.youtube.com/results?search_query=Chris+Zabriskie+Cylinder+Five"},
+{t:"Night Snow",a:"Asher Fulero",ts:"0:14–0:54",u:"https://www.youtube.com/results?search_query=Asher+Fulero+Night+Snow"},
+{t:"Morning Mandolin",a:"Chris Haugen",ts:"0:20–1:00",u:"https://www.youtube.com/results?search_query=Chris+Haugen+Morning+Mandolin"},
+{t:"Quiet Time",a:"Aaron Kenny",ts:"0:08–0:48",u:"https://www.youtube.com/results?search_query=Aaron+Kenny+Quiet+Time"}
 ];
+const CAPTIONS=["one more level.","this is oddly satisfying.","watch this room transform.","i can't stop playing this.","cozy little grind."];
+let sessions=JSON.parse(localStorage.getItem("cozy_sessions")||"[]"),used=JSON.parse(localStorage.getItem("cozy_used")||"[]");
+const save=()=>{localStorage.setItem("cozy_sessions",JSON.stringify(sessions));localStorage.setItem("cozy_used",JSON.stringify(used));render();};
 
-const CAPTIONS=[
-"one more level.",
-"this is oddly satisfying.",
-"watch this room transform.",
-"i can't stop playing this.",
-"cozy little grind."
-];
+newSession.onclick=()=>{if(!game.value.trim())return;sessions.unshift({game:game.value,date:new Date().toLocaleDateString(),clips:[]});game.value="";save();};
 
-let sessions=JSON.parse(localStorage.getItem("cozy_sessions")||"[]");
-let used=JSON.parse(localStorage.getItem("cozy_used")||"[]");
+function renderMusic(){music.innerHTML="";MUSIC.forEach((m,i)=>music.innerHTML+=`<div class=track><div class=row><div style="font-size:40px">💿</div><div style="flex:1"><strong>${m.t}</strong><div class=small>${m.a}</div><div class=small>${m.ts}</div><a target=_blank href="${m.u}">Open Track</a></div><button class="${used.includes(i)?'green':''}" onclick="toggleMusic(${i})">${used.includes(i)?'Used':'Unused'}</button></div></div>`);}
+window.toggleMusic=i=>{used.includes(i)?used=used.filter(x=>x!==i):used.push(i);save();};
+shuffle.onclick=()=>{const p=MUSIC.filter((_,i)=>!used.includes(i));const x=p[Math.floor(Math.random()*p.length)]||MUSIC[0];alert(`${x.t}\n${x.a}\n${x.ts}`);};
 
-function save(){
-  localStorage.setItem("cozy_sessions",JSON.stringify(sessions));
-  localStorage.setItem("cozy_used",JSON.stringify(used));
-  render();
-}
+function renderCaptions(){captions.innerHTML="";CAPTIONS.forEach(c=>{const b=document.createElement("button");b.className="alt";b.style.margin="4px";b.textContent=c;b.onclick=()=>navigator.clipboard.writeText(c);captions.appendChild(b);});}
 
-document.getElementById("newSession").onclick=()=>{
-  const input=document.getElementById("game");
-  if(!input.value.trim()) return;
-  sessions.unshift({
-    game:input.value,
-    date:new Date().toLocaleDateString(),
-    clips:[]
-  });
-  input.value="";
-  save();
+window.toggleSession=i=>{const e=document.getElementById("o"+i);e.style.display=e.style.display==="none"?"block":"none";};
+
+window.generateClips=async(i)=>{
+ const file=document.getElementById("f"+i).files[0]; if(!file)return alert("Choose a recording first.");
+ const len=parseInt(document.getElementById("l"+i).value); const bar=document.getElementById("fill"+i); bar.style.width="5%";
+ await loadFF(); bar.style.width="20%";
+ await ffmpeg.writeFile("input.mp4", await fetchFile(file));
+ const v=document.createElement("video"); v.src=URL.createObjectURL(file);
+ await new Promise(r=>v.onloadedmetadata=r);
+ sessions[i].clips=[]; let n=1;
+ for(let t=0;t<v.duration;t+=len){
+  const out=`clip_${String(n++).padStart(2,"0")}.mp4`;
+  await ffmpeg.exec(["-ss",String(t),"-t",String(len),"-i","input.mp4","-c","copy",out]);
+  const data=await ffmpeg.readFile(out);
+  const blob=new Blob([data.buffer],{type:"video/mp4"});
+  sessions[i].clips.push({name:out,start:Math.floor(t),end:Math.min(Math.floor(t+len),Math.floor(v.duration)),yt:false,ig:false,url:URL.createObjectURL(blob)});
+  bar.style.width=`${20+80*(t+len)/v.duration}%`;
+ }
+ bar.style.width="100%"; save();
 };
 
-function renderMusic(){
-  const box=document.getElementById("music");
-  box.innerHTML="";
+window.yt=(s,c)=>{sessions[s].clips[c].yt=!sessions[s].clips[c].yt;save();};
+window.ig=(s,c)=>{sessions[s].clips[c].ig=!sessions[s].clips[c].ig;save();};
 
-  MUSIC.forEach((m,i)=>{
-    const isUsed=used.includes(i);
-
-    box.innerHTML+=`
-      <div class="track">
-        <div class="row">
-          <div style="font-size:40px">💿</div>
-
-          <div style="flex:1">
-            <strong>${m.title}</strong>
-            <div class="small">${m.artist}</div>
-            <div class="small">Best section: ${m.time}</div>
-            <a href="${m.link}" target="_blank">Open Track</a>
-          </div>
-
-          <button class="${isUsed?"green":""}" onclick="toggleMusic(${i})">
-            ${isUsed?"Used":"Unused"}
-          </button>
-
-        </div>
-      </div>`;
-  });
-}
-
-window.toggleMusic=i=>{
-  if(used.includes(i)){
-    used=used.filter(x=>x!==i);
-  }else{
-    used.push(i);
-  }
-  save();
-};
-
-document.getElementById("shuffle").onclick=()=>{
-  const available=MUSIC.filter((_,i)=>!used.includes(i));
-  const pick=available.length?available[Math.floor(Math.random()*available.length)]:MUSIC[Math.floor(Math.random()*MUSIC.length)];
-
-  alert(`🎵 ${pick.title}\n${pick.artist}\nBest: ${pick.time}`);
-};
-
-function renderCaptions(){
-  const box=document.getElementById("captions");
-  box.innerHTML="";
-
-  CAPTIONS.forEach(text=>{
-    const btn=document.createElement("button");
-    btn.className="alt";
-    btn.style.margin="4px";
-    btn.textContent=text;
-    btn.onclick=()=>navigator.clipboard.writeText(text);
-    box.appendChild(btn);
-  });
+function renderClipList(i){
+ const box=document.getElementById("c"+i); if(!box)return; box.innerHTML="";
+ (sessions[i].clips||[]).forEach((clip,j)=>box.innerHTML+=`<div class=clip><div class=row><div><strong>${clip.name}</strong><div class=small>${clip.start}s–${clip.end}s</div></div><div><button class="${clip.yt?'green':''}" onclick="yt(${i},${j})">${clip.yt?'Uploaded':'YouTube'}</button> <button class="${clip.ig?'green':''}" onclick="ig(${i},${j})">${clip.ig?'Uploaded':'Instagram'}</button> <a download="${clip.name}" href="${clip.url||'#'}"><button>Download</button></a></div></div></div>`);
 }
 
 function renderSessions(){
-  const box=document.getElementById("sessions");
-
-  document.getElementById("stats").textContent=`${sessions.length} session${sessions.length===1?"":"s"}`;
-
-  if(!sessions.length){
-    box.innerHTML='<div class="small">Your gameplay sessions will appear here.</div>';
-    return;
-  }
-
-  box.innerHTML="";
-
-  sessions.forEach((session,index)=>{
-
-    const card=document.createElement("div");
-    card.className="session";
-
-    card.innerHTML=`
-      <div class="row">
-        <div>
-          <strong>${session.game}</strong>
-          <div class="small">${session.date}</div>
-        </div>
-
-        <button class="alt" onclick="toggleSession(${index})">
-          Continue
-        </button>
-      </div>
-
-      <div id="open${index}" style="display:none;margin-top:14px">
-
-        <input type="file" accept="video/*" id="file${index}">
-
-        <div class="row">
-          <select id="length${index}">
-            <option>20</option>
-            <option selected>30</option>
-            <option>40</option>
-          </select>
-
-          <button onclick="generateClips(${index})">
-            Generate
-          </button>
-        </div>
-
-        <div id="clips${index}"></div>
-
-      </div>`;
-
-    box.appendChild(card);
-
-    renderClipList(index);
-
-  });
+ stats.textContent=`${sessions.length} session${sessions.length!==1?'s':''}`;
+ const box=document.getElementById("sessions"); if(!sessions.length){box.innerHTML="<div class=small>Your gameplay sessions will appear here.</div>";return;}
+ box.innerHTML=""; sessions.forEach((s,i)=>{const d=document.createElement("div");d.className="session";d.innerHTML=`<div class=row><div><strong>${s.game}</strong><div class=small>${s.date}</div></div><button class=alt onclick="toggleSession(${i})">Continue</button></div><div id="o${i}" style="display:none;margin-top:14px"><input type=file accept="video/*" id="f${i}"><div class=row><select id="l${i}"><option>20</option><option selected>30</option><option>40</option></select><button onclick="generateClips(${i})">Generate</button></div><div class=progress><div class=fill id="fill${i}"></div></div><div id="c${i}"></div></div>`;box.appendChild(d);renderClipList(i);});
 }
 
-window.toggleSession=index=>{
-  const panel=document.getElementById(`open${index}`);
-  panel.style.display=panel.style.display==="none"?"block":"none";
-};
-
-window.generateClips=index=>{
-
-  const file=document.getElementById(`file${index}`).files[0];
-
-  if(!file){
-    alert("Choose a gameplay recording first.");
-    return;
-  }
-
-  const length=parseInt(document.getElementById(`length${index}`).value);
-
-  const video=document.createElement("video");
-  video.src=URL.createObjectURL(file);
-
-  video.onloadedmetadata=()=>{
-
-    sessions[index].clips=[];
-
-    let count=1;
-
-    for(let t=0;t<video.duration;t+=length){
-
-      sessions[index].clips.push({
-        name:`clip_${String(count++).padStart(2,"0")}.mp4`,
-        start:Math.floor(t),
-        end:Math.min(Math.floor(t+length),Math.floor(video.duration)),
-        yt:false,
-        ig:false
-      });
-
-    }
-
-    save();
-
-  };
-
-};
-
-function renderClipList(index){
-
-  const box=document.getElementById(`clips${index}`);
-
-  if(!box) return;
-
-  box.innerHTML="";
-
-  sessions[index].clips.forEach((clip,i)=>{
-
-    box.innerHTML+=`
-      <div class="clip">
-
-        <div class="row">
-
-          <div>
-            <strong>${clip.name}</strong>
-            <div class="small">${clip.start}s – ${clip.end}s</div>
-          </div>
-
-          <div>
-            <button class="${clip.yt?"green":""}" onclick="toggleYT(${index},${i})">
-              ${clip.yt?"Uploaded":"YouTube"}
-            </button>
-
-            <button class="${clip.ig?"green":""}" onclick="toggleIG(${index},${i})">
-              ${clip.ig?"Uploaded":"Instagram"}
-            </button>
-          </div>
-
-        </div>
-
-      </div>`;
-  });
-
-}
-
-window.toggleYT=(s,c)=>{
-  sessions[s].clips[c].yt=!sessions[s].clips[c].yt;
-  save();
-};
-
-window.toggleIG=(s,c)=>{
-  sessions[s].clips[c].ig=!sessions[s].clips[c].ig;
-  save();
-};
-
-function render(){
-  renderMusic();
-  renderCaptions();
-  renderSessions();
-}
-
+function render(){renderMusic();renderCaptions();renderSessions();}
 render();
-
-</script>
-
-</body>
-</html>
+</script></body></html>
