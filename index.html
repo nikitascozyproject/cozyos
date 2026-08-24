@@ -1,85 +1,1731 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CozyOS Lite v1.2</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS v1.3</title>
+
 <style>
-:root{--bg:#f8f5f1;--card:#fffdf9;--text:#2d2926;--brown:#8c735c;--sage:#6e9a73;--line:#e8dfd5}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui;color:var(--text)}
-.wrap{max-width:920px;margin:auto;padding:24px}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;margin-bottom:18px;box-shadow:0 8px 24px rgba(0,0,0,.05)}
-.row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-button{background:var(--brown);color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:600;cursor:pointer}
-button.alt{background:#ececec;color:#333}button.green{background:var(--sage)}
-input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);margin:8px 0}
-.session,.track,.clip{border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;background:#fff}
-.small{font-size:13px;color:#777}.pill{background:#f2ece5;padding:6px 10px;border-radius:999px;font-size:12px}
-.progress{height:10px;background:#eee;border-radius:999px;overflow:hidden}.fill{height:100%;width:0;background:var(--sage);transition:.2s}
-</style></head>
-<body><div class="wrap">
-<div class="card"><div class="row"><div><h1>☁️ CozyOS Lite v1.2</h1><div class="small">The Clip Factory</div></div><div class="pill" id="stats">0 sessions</div></div></div>
-<div class="card"><h2>🎮 New Session</h2><input id="game" placeholder="Game name"><button id="newSession">Start Session</button></div>
-<div class="card"><div class="row"><h2>📚 Sessions</h2><span class="small">Auto-saved</span></div><div id="sessions"></div></div>
-<div class="card"><div class="row"><h2>🎵 Music Vault</h2><button class="alt" id="shuffle">Random Pick</button></div><div id="music"></div></div>
-<div class="card"><h2>✍️ Caption Bank</h2><div id="captions"></div></div></div>
-<script type="module">
-import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js";
-import { fetchFile } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js";
-const ffmpeg=new FFmpeg(); let loaded=false;
-async function loadFF(){ if(!loaded){ await ffmpeg.load({coreURL:"https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js"}); loaded=true; } }
+:root{
+  --bg:#f8f5f1;
+  --card:#fffdf9;
+  --text:#2d2926;
+  --muted:#77706a;
+  --brown:#8c735c;
+  --sage:#6e9a73;
+  --line:#e7ded4;
+  --soft:#f1ebe4;
+}
 
-const MUSIC=[
-{t:"Cylinder Five",a:"Chris Zabriskie",ts:"0:42–1:22",u:"https://www.youtube.com/results?search_query=Chris+Zabriskie+Cylinder+Five"},
-{t:"Night Snow",a:"Asher Fulero",ts:"0:14–0:54",u:"https://www.youtube.com/results?search_query=Asher+Fulero+Night+Snow"},
-{t:"Morning Mandolin",a:"Chris Haugen",ts:"0:20–1:00",u:"https://www.youtube.com/results?search_query=Chris+Haugen+Morning+Mandolin"},
-{t:"Quiet Time",a:"Aaron Kenny",ts:"0:08–0:48",u:"https://www.youtube.com/results?search_query=Aaron+Kenny+Quiet+Time"}
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.wrap{
+  max-width:920px;
+  margin:auto;
+  padding:24px;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:20px;
+  margin-bottom:18px;
+  box-shadow:0 8px 25px rgba(45,41,38,.05);
+}
+
+.row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:10px 15px;
+  background:var(--brown);
+  color:white;
+  font-weight:700;
+  cursor:pointer;
+}
+
+button:hover{
+  opacity:.92;
+}
+
+button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+button.alt{
+  background:var(--soft);
+  color:var(--text);
+}
+
+button.green{
+  background:var(--sage);
+}
+
+input,
+select{
+  width:100%;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  margin:7px 0 12px;
+  background:white;
+  font:inherit;
+}
+
+.drop{
+  border:2px dashed #d5c6b8;
+  border-radius:18px;
+  padding:30px;
+  text-align:center;
+  background:#fffaf5;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.drop.drag{
+  background:#f0e9e1;
+  border-color:var(--brown);
+}
+
+.small{
+  font-size:13px;
+  color:var(--muted);
+}
+
+.file-name{
+  margin-top:10px;
+  font-weight:700;
+}
+
+.pill{
+  background:var(--soft);
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+}
+
+.session,
+.clip,
+.track{
+  background:white;
+  border:1px solid var(--line);
+  border-radius:15px;
+  padding:14px;
+  margin-top:10px;
+}
+
+.progress{
+  height:10px;
+  background:#eee8e2;
+  border-radius:99px;
+  overflow:hidden;
+  margin:12px 0;
+}
+
+.fill{
+  height:100%;
+  width:0;
+  background:var(--sage);
+  transition:.15s;
+}
+
+.actions{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+}
+
+a{
+  color:var(--brown);
+}
+
+.notice{
+  background:var(--soft);
+  padding:12px;
+  border-radius:12px;
+  margin-top:12px;
+}
+
+@media(max-width:650px){
+  .wrap{
+    padding:14px;
+  }
+
+  .card{
+    padding:17px;
+  }
+
+  .actions{
+    width:100%;
+  }
+
+  .actions button{
+    flex:1;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+<div class="card">
+  <div class="row">
+    <div>
+      <h1>☁️ CozyOS</h1>
+      <div class="small">v1.3 · Automatic Batch Clipper</div>
+    </div>
+
+    <span class="pill" id="sessionCount">
+      0 sessions
+    </span>
+  </div>
+</div>
+
+
+<div class="card">
+
+  <h2>🎮 New Session</h2>
+
+  <input
+    id="gameInput"
+    placeholder="Game name"
+  >
+
+  <button id="createSession">
+    Start Session
+  </button>
+
+</div>
+
+
+<div class="card">
+
+  <h2>✂️ Automatic Clip Factory</h2>
+
+  <div class="small">
+    Upload one gameplay recording and CozyOS will automatically break the
+    entire recording into consecutive clips.
+  </div>
+
+  <div
+    id="dropZone"
+    class="drop"
+  >
+
+    <strong>
+      Drop your gameplay recording here
+    </strong>
+
+    <div class="small">
+      or tap to choose a video
+    </div>
+
+    <input
+      id="videoInput"
+      type="file"
+      accept="video/*"
+      hidden
+    >
+
+    <div
+      id="fileName"
+      class="file-name"
+    ></div>
+
+  </div>
+
+
+  <div class="row">
+
+    <div style="flex:1;min-width:180px">
+
+      <div class="small">
+        Clip length
+      </div>
+
+      <select id="clipLength">
+
+        <option value="20">
+          20 seconds
+        </option>
+
+        <option value="30" selected>
+          30 seconds
+        </option>
+
+        <option value="40">
+          40 seconds
+        </option>
+
+      </select>
+
+    </div>
+
+
+    <div style="flex:1;min-width:180px">
+
+      <div class="small">
+        Session
+      </div>
+
+      <select id="sessionSelect">
+      </select>
+
+    </div>
+
+  </div>
+
+
+  <button
+    id="makeClips"
+    disabled
+  >
+    BREAK INTO CLIPS
+  </button>
+
+
+  <div
+    id="status"
+    class="notice"
+  >
+    Choose a recording to begin.
+  </div>
+
+
+  <div class="progress">
+
+    <div
+      id="progressFill"
+      class="fill"
+    ></div>
+
+  </div>
+
+
+  <div
+    id="progressText"
+    class="small"
+  ></div>
+
+</div>
+
+
+<div class="card">
+
+  <div class="row">
+
+    <h2>
+      📤 Publishing Queue
+    </h2>
+
+    <span
+      class="small"
+      id="clipCount"
+    >
+      0 clips
+    </span>
+
+  </div>
+
+  <div id="queue"></div>
+
+</div>
+
+
+<div class="card">
+
+  <div class="row">
+
+    <h2>
+      📚 Sessions
+    </h2>
+
+    <span class="small">
+      Saved in this browser
+    </span>
+
+  </div>
+
+  <div id="sessions"></div>
+
+</div>
+
+
+<div class="card">
+
+  <div class="row">
+
+    <h2>
+      🎵 Music Vault
+    </h2>
+
+    <button
+      class="alt"
+      id="shuffleMusic"
+    >
+      Random Pick
+    </button>
+
+  </div>
+
+  <div id="music"></div>
+
+</div>
+
+
+<div class="card">
+
+  <h2>
+    ✍️ Caption Bank
+  </h2>
+
+  <div id="captions"></div>
+
+</div>
+
+</div>
+
+
+<script>
+
+const MUSIC = [
+
+  {
+    title:"Cylinder Five",
+    artist:"Chris Zabriskie",
+    time:"0:42–1:22",
+    link:"https://www.youtube.com/results?search_query=Chris+Zabriskie+Cylinder+Five"
+  },
+
+  {
+    title:"Night Snow",
+    artist:"Asher Fulero",
+    time:"0:14–0:54",
+    link:"https://www.youtube.com/results?search_query=Asher+Fulero+Night+Snow"
+  },
+
+  {
+    title:"Morning Mandolin",
+    artist:"Chris Haugen",
+    time:"0:20–1:00",
+    link:"https://www.youtube.com/results?search_query=Chris+Haugen+Morning+Mandolin"
+  },
+
+  {
+    title:"Quiet Time",
+    artist:"Aaron Kenny",
+    time:"0:08–0:48",
+    link:"https://www.youtube.com/results?search_query=Aaron+Kenny+Quiet+Time"
+  }
+
 ];
-const CAPTIONS=["one more level.","this is oddly satisfying.","watch this room transform.","i can't stop playing this.","cozy little grind."];
-let sessions=JSON.parse(localStorage.getItem("cozy_sessions")||"[]"),used=JSON.parse(localStorage.getItem("cozy_used")||"[]");
-const save=()=>{localStorage.setItem("cozy_sessions",JSON.stringify(sessions));localStorage.setItem("cozy_used",JSON.stringify(used));render();};
 
-newSession.onclick=()=>{if(!game.value.trim())return;sessions.unshift({game:game.value,date:new Date().toLocaleDateString(),clips:[]});game.value="";save();};
 
-function renderMusic(){music.innerHTML="";MUSIC.forEach((m,i)=>music.innerHTML+=`<div class=track><div class=row><div style="font-size:40px">💿</div><div style="flex:1"><strong>${m.t}</strong><div class=small>${m.a}</div><div class=small>${m.ts}</div><a target=_blank href="${m.u}">Open Track</a></div><button class="${used.includes(i)?'green':''}" onclick="toggleMusic(${i})">${used.includes(i)?'Used':'Unused'}</button></div></div>`);}
-window.toggleMusic=i=>{used.includes(i)?used=used.filter(x=>x!==i):used.push(i);save();};
-shuffle.onclick=()=>{const p=MUSIC.filter((_,i)=>!used.includes(i));const x=p[Math.floor(Math.random()*p.length)]||MUSIC[0];alert(`${x.t}\n${x.a}\n${x.ts}`);};
+const CAPTIONS = [
 
-function renderCaptions(){captions.innerHTML="";CAPTIONS.forEach(c=>{const b=document.createElement("button");b.className="alt";b.style.margin="4px";b.textContent=c;b.onclick=()=>navigator.clipboard.writeText(c);captions.appendChild(b);});}
+  "one more level.",
 
-window.toggleSession=i=>{const e=document.getElementById("o"+i);e.style.display=e.style.display==="none"?"block":"none";};
+  "this is oddly satisfying.",
 
-window.generateClips=async(i)=>{
- const file=document.getElementById("f"+i).files[0]; if(!file)return alert("Choose a recording first.");
- const len=parseInt(document.getElementById("l"+i).value); const bar=document.getElementById("fill"+i); bar.style.width="5%";
- await loadFF(); bar.style.width="20%";
- await ffmpeg.writeFile("input.mp4", await fetchFile(file));
- const v=document.createElement("video"); v.src=URL.createObjectURL(file);
- await new Promise(r=>v.onloadedmetadata=r);
- sessions[i].clips=[]; let n=1;
- for(let t=0;t<v.duration;t+=len){
-  const out=`clip_${String(n++).padStart(2,"0")}.mp4`;
-  await ffmpeg.exec(["-ss",String(t),"-t",String(len),"-i","input.mp4","-c","copy",out]);
-  const data=await ffmpeg.readFile(out);
-  const blob=new Blob([data.buffer],{type:"video/mp4"});
-  sessions[i].clips.push({name:out,start:Math.floor(t),end:Math.min(Math.floor(t+len),Math.floor(v.duration)),yt:false,ig:false,url:URL.createObjectURL(blob)});
-  bar.style.width=`${20+80*(t+len)/v.duration}%`;
- }
- bar.style.width="100%"; save();
+  "watch this room transform.",
+
+  "i can't stop playing this.",
+
+  "cozy little grind."
+
+];
+
+
+let sessions =
+  JSON.parse(
+    localStorage.getItem("cozy_sessions_v13") || "[]"
+  );
+
+
+let usedMusic =
+  JSON.parse(
+    localStorage.getItem("cozy_used_v13") || "[]"
+  );
+
+
+let selectedFile = null;
+
+
+const $ = id =>
+  document.getElementById(id);
+
+
+function saveData(){
+
+  localStorage.setItem(
+    "cozy_sessions_v13",
+    JSON.stringify(sessions)
+  );
+
+  localStorage.setItem(
+    "cozy_used_v13",
+    JSON.stringify(usedMusic)
+  );
+
+  renderAll();
+
+}
+
+
+function escapeHTML(value){
+
+  return String(value).replace(
+    /[&<>"']/g,
+
+    character => ({
+
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+
+    }[character])
+
+  );
+
+}
+
+
+function safeFilename(value){
+
+  return String(value)
+    .replace(/[^a-z0-9]+/gi,"_")
+    .replace(/^_|_$/g,"")
+    .toLowerCase()
+    || "game";
+
+}
+
+
+/* SESSION CREATION */
+
+$("createSession").onclick = () => {
+
+  const name =
+    $("gameInput").value.trim();
+
+  if(!name){
+
+    alert(
+      "Enter a game name first."
+    );
+
+    return;
+
+  }
+
+
+  sessions.unshift({
+
+    game:name,
+
+    date:new Date()
+      .toLocaleDateString(),
+
+    clips:[]
+
+  });
+
+
+  $("gameInput").value = "";
+
+  saveData();
+
 };
 
-window.yt=(s,c)=>{sessions[s].clips[c].yt=!sessions[s].clips[c].yt;save();};
-window.ig=(s,c)=>{sessions[s].clips[c].ig=!sessions[s].clips[c].ig;save();};
 
-function renderClipList(i){
- const box=document.getElementById("c"+i); if(!box)return; box.innerHTML="";
- (sessions[i].clips||[]).forEach((clip,j)=>box.innerHTML+=`<div class=clip><div class=row><div><strong>${clip.name}</strong><div class=small>${clip.start}s–${clip.end}s</div></div><div><button class="${clip.yt?'green':''}" onclick="yt(${i},${j})">${clip.yt?'Uploaded':'YouTube'}</button> <button class="${clip.ig?'green':''}" onclick="ig(${i},${j})">${clip.ig?'Uploaded':'Instagram'}</button> <a download="${clip.name}" href="${clip.url||'#'}"><button>Download</button></a></div></div></div>`);
+/* VIDEO SELECTION */
+
+$("dropZone").onclick = () => {
+
+  $("videoInput").click();
+
+};
+
+
+$("videoInput").onchange = event => {
+
+  setSelectedFile(
+    event.target.files[0]
+  );
+
+};
+
+
+["dragenter","dragover"].forEach(
+  eventName => {
+
+    $("dropZone").addEventListener(
+      eventName,
+
+      event => {
+
+        event.preventDefault();
+
+        $("dropZone")
+          .classList.add("drag");
+
+      }
+
+    );
+
+  }
+);
+
+
+["dragleave","drop"].forEach(
+  eventName => {
+
+    $("dropZone").addEventListener(
+      eventName,
+
+      event => {
+
+        event.preventDefault();
+
+        $("dropZone")
+          .classList.remove("drag");
+
+      }
+
+    );
+
+  }
+);
+
+
+$("dropZone").addEventListener(
+  "drop",
+
+  event => {
+
+    setSelectedFile(
+      event.dataTransfer.files[0]
+    );
+
+  }
+
+);
+
+
+function setSelectedFile(file){
+
+  if(!file){
+
+    return;
+
+  }
+
+
+  if(!file.type.startsWith("video/")){
+
+    alert(
+      "Please choose a video file."
+    );
+
+    return;
+
+  }
+
+
+  selectedFile = file;
+
+
+  $("fileName").textContent =
+    file.name;
+
+
+  $("makeClips").disabled =
+    false;
+
+
+  $("status").textContent =
+    "Ready. CozyOS will split the entire recording.";
+
 }
+
+
+/*
+  AUTOMATIC BATCH CLIP CREATION
+
+  The complete recording is automatically
+  divided into consecutive segments.
+*/
+
+$("makeClips").onclick = async () => {
+
+  if(!selectedFile){
+
+    return;
+
+  }
+
+
+  if(!sessions.length){
+
+    alert(
+      "Create a session first."
+    );
+
+    return;
+
+  }
+
+
+  const sessionIndex =
+    Number(
+      $("sessionSelect").value
+    );
+
+
+  const clipLength =
+    Number(
+      $("clipLength").value
+    );
+
+
+  const video =
+    document.createElement("video");
+
+
+  video.preload = "metadata";
+
+
+  video.src =
+    URL.createObjectURL(
+      selectedFile
+    );
+
+
+  $("makeClips").disabled =
+    true;
+
+
+  $("progressFill").style.width =
+    "0%";
+
+
+  $("progressText").textContent =
+    "Reading recording...";
+
+
+  try{
+
+    await new Promise(
+      (resolve,reject) => {
+
+        video.onloadedmetadata =
+          resolve;
+
+        video.onerror =
+          () => reject(
+            new Error(
+              "Could not read video."
+            )
+          );
+
+      }
+    );
+
+
+    const duration =
+      video.duration;
+
+
+    if(
+      !Number.isFinite(duration) ||
+      duration <= 0
+    ){
+
+      throw new Error(
+        "Invalid video duration."
+      );
+
+    }
+
+
+    const totalClips =
+      Math.ceil(
+        duration / clipLength
+      );
+
+
+    sessions[sessionIndex].clips =
+      [];
+
+
+    $("status").textContent =
+      `Breaking recording into ${totalClips} clips...`;
+
+
+    for(
+      let index = 0;
+      index < totalClips;
+      index++
+    ){
+
+      const start =
+        index * clipLength;
+
+
+      const end =
+        Math.min(
+          start + clipLength,
+          duration
+        );
+
+
+      sessions[sessionIndex].clips.push({
+
+        name:
+          `${safeFilename(
+            sessions[sessionIndex].game
+          )}_clip_${String(
+            index + 1
+          ).padStart(2,"0")}.webm`,
+
+        start:start,
+
+        end:end,
+
+        duration:end - start,
+
+        yt:false,
+
+        ig:false,
+
+        blobUrl:null
+
+      });
+
+
+      const percent =
+        Math.round(
+          ((index + 1) /
+          totalClips) * 100
+        );
+
+
+      $("progressFill")
+        .style.width =
+        percent + "%";
+
+
+      $("progressText")
+        .textContent =
+        `Prepared ${index + 1} of ${totalClips} clips`;
+
+
+      await new Promise(
+        resolve =>
+          setTimeout(resolve,0)
+      );
+
+    }
+
+
+    $("status").textContent =
+      `${totalClips} clips prepared.`;
+
+    $("progressText").textContent =
+      `Entire recording divided into ${totalClips} clips.`;
+
+
+    saveData();
+
+  }
+  catch(error){
+
+    console.error(error);
+
+    $("status").textContent =
+      "CozyOS couldn't read this video.";
+
+    alert(
+      "I couldn't read that video in this browser. Try Chrome or Edge."
+    );
+
+  }
+  finally{
+
+    $("makeClips").disabled =
+      false;
+
+    URL.revokeObjectURL(
+      video.src
+    );
+
+  }
+
+};
+
+
+/*
+  EXPORT ONE CLIP
+
+  Browser-native MediaRecorder is used so
+  CozyOS does not require another installation.
+*/
+
+async function createVideoClip(
+  sourceFile,
+  start,
+  end
+){
+
+  const video =
+    document.createElement("video");
+
+
+  video.src =
+    URL.createObjectURL(
+      sourceFile
+    );
+
+
+  video.preload =
+    "auto";
+
+
+  await new Promise(
+    (resolve,reject) => {
+
+      video.onloadedmetadata =
+        resolve;
+
+      video.onerror =
+        () => reject(
+          new Error(
+            "Video could not be loaded."
+          )
+        );
+
+    }
+  );
+
+
+  await new Promise(
+    resolve => {
+
+      video.currentTime =
+        start;
+
+      video.onseeked =
+        resolve;
+
+    }
+  );
+
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    video.videoWidth || 1280;
+
+
+  canvas.height =
+    video.videoHeight || 720;
+
+
+  const context =
+    canvas.getContext(
+      "2d"
+    );
+
+
+  const stream =
+    canvas.captureStream(
+      30
+    );
+
+
+  const mimeTypes = [
+
+    "video/webm;codecs=vp9",
+
+    "video/webm;codecs=vp8",
+
+    "video/webm"
+
+  ];
+
+
+  const mimeType =
+    mimeTypes.find(
+      type =>
+        MediaRecorder
+          .isTypeSupported(type)
+    );
+
+
+  if(!mimeType){
+
+    throw new Error(
+      "Browser does not support video export."
+    );
+
+  }
+
+
+  const recorder =
+    new MediaRecorder(
+      stream,
+      {
+        mimeType:mimeType
+      }
+    );
+
+
+  const chunks = [];
+
+
+  recorder.ondataavailable =
+    event => {
+
+      if(event.data.size){
+
+        chunks.push(
+          event.data
+        );
+
+      }
+
+    };
+
+
+  const finished =
+    new Promise(
+      resolve => {
+
+        recorder.onstop =
+          resolve;
+
+      }
+    );
+
+
+  recorder.start();
+
+
+  await video.play();
+
+
+  await new Promise(
+    resolve => {
+
+      function draw(){
+
+        if(
+          video.currentTime >= end ||
+          video.ended
+        ){
+
+          video.pause();
+
+          recorder.stop();
+
+          resolve();
+
+          return;
+
+        }
+
+
+        context.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+
+        requestAnimationFrame(
+          draw
+        );
+
+      }
+
+
+      draw();
+
+    }
+  );
+
+
+  await finished;
+
+
+  video.pause();
+
+
+  URL.revokeObjectURL(
+    video.src
+  );
+
+
+  return new Blob(
+    chunks,
+    {
+      type:mimeType
+    }
+  );
+
+}
+
+
+/* DOWNLOAD CLIP */
+
+window.downloadClip =
+  async (
+    sessionIndex,
+    clipIndex
+  ) => {
+
+    if(!selectedFile){
+
+      alert(
+        "Please upload the original gameplay recording again before downloading clips."
+      );
+
+      return;
+
+    }
+
+
+    const clip =
+      sessions[
+        sessionIndex
+      ].clips[
+        clipIndex
+      ];
+
+
+    try{
+
+      $("status").textContent =
+        `Creating ${clip.name}...`;
+
+
+      const blob =
+        await createVideoClip(
+          selectedFile,
+          clip.start,
+          clip.end
+        );
+
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+
+      clip.blobUrl =
+        url;
+
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+
+      link.href =
+        url;
+
+
+      link.download =
+        clip.name;
+
+
+      document.body.appendChild(
+        link
+      );
+
+
+      link.click();
+
+
+      link.remove();
+
+
+      $("status").textContent =
+        `${clip.name} downloaded.`;
+
+    }
+    catch(error){
+
+      console.error(error);
+
+      alert(
+        "This browser could not export the clip. Chrome or Edge on a laptop is recommended."
+      );
+
+    }
+
+  };
+
+
+/* UPLOAD TRACKING */
+
+window.toggleYouTube =
+  (
+    sessionIndex,
+    clipIndex
+  ) => {
+
+    sessions[
+      sessionIndex
+    ].clips[
+      clipIndex
+    ].yt =
+      !sessions[
+        sessionIndex
+      ].clips[
+        clipIndex
+      ].yt;
+
+
+    saveData();
+
+  };
+
+
+window.toggleInstagram =
+  (
+    sessionIndex,
+    clipIndex
+  ) => {
+
+    sessions[
+      sessionIndex
+    ].clips[
+      clipIndex
+    ].ig =
+      !sessions[
+        sessionIndex
+      ].clips[
+        clipIndex
+      ].ig;
+
+
+    saveData();
+
+  };
+
+
+/* SESSIONS */
 
 function renderSessions(){
- stats.textContent=`${sessions.length} session${sessions.length!==1?'s':''}`;
- const box=document.getElementById("sessions"); if(!sessions.length){box.innerHTML="<div class=small>Your gameplay sessions will appear here.</div>";return;}
- box.innerHTML=""; sessions.forEach((s,i)=>{const d=document.createElement("div");d.className="session";d.innerHTML=`<div class=row><div><strong>${s.game}</strong><div class=small>${s.date}</div></div><button class=alt onclick="toggleSession(${i})">Continue</button></div><div id="o${i}" style="display:none;margin-top:14px"><input type=file accept="video/*" id="f${i}"><div class=row><select id="l${i}"><option>20</option><option selected>30</option><option>40</option></select><button onclick="generateClips(${i})">Generate</button></div><div class=progress><div class=fill id="fill${i}"></div></div><div id="c${i}"></div></div>`;box.appendChild(d);renderClipList(i);});
+
+  $("sessionCount")
+    .textContent =
+    `${sessions.length} session${
+      sessions.length === 1
+      ? ""
+      : "s"
+    }`;
+
+
+  if(!sessions.length){
+
+    $("sessions").innerHTML =
+      `<div class="small">
+        No sessions yet.
+      </div>`;
+
+  }
+  else{
+
+    $("sessions").innerHTML =
+      sessions.map(
+        (session,index) => `
+
+        <div class="session">
+
+          <div class="row">
+
+            <div>
+
+              <strong>
+                ${escapeHTML(
+                  session.game
+                )}
+              </strong>
+
+              <div class="small">
+
+                ${session.date}
+
+                ·
+
+                ${
+                  (session.clips || [])
+                    .length
+                }
+
+                clips
+
+              </div>
+
+            </div>
+
+
+            <button
+              class="alt"
+              onclick="
+                document.getElementById(
+                  'sessionSelect'
+                ).value=${index}
+              "
+            >
+
+              Use for Clipping
+
+            </button>
+
+          </div>
+
+        </div>
+
+      `
+      ).join("");
+
+  }
+
+
+  const selector =
+    $("sessionSelect");
+
+
+  if(!sessions.length){
+
+    selector.innerHTML =
+      `<option value="">
+        Create a session first
+      </option>`;
+
+  }
+  else{
+
+    selector.innerHTML =
+      sessions.map(
+        (session,index) => `
+
+        <option value="${index}">
+
+          ${escapeHTML(
+            session.game
+          )}
+
+          —
+
+          ${session.date}
+
+        </option>
+
+      `
+      ).join("");
+
+  }
+
 }
 
-function render(){renderMusic();renderCaptions();renderSessions();}
-render();
-</script></body></html>
+
+/* PUBLISHING QUEUE */
+
+function renderQueue(){
+
+  const allClips = [];
+
+
+  sessions.forEach(
+    (session,sessionIndex) => {
+
+      (
+        session.clips || []
+      ).forEach(
+        (clip,clipIndex) => {
+
+          allClips.push({
+
+            sessionIndex,
+
+            clipIndex,
+
+            session,
+
+            clip
+
+          });
+
+        }
+      );
+
+    }
+  );
+
+
+  $("clipCount")
+    .textContent =
+    `${allClips.length} clip${
+      allClips.length === 1
+      ? ""
+      : "s"
+    }`;
+
+
+  if(!allClips.length){
+
+    $("queue").innerHTML =
+      `<div class="small">
+        Your generated clips will appear here.
+      </div>`;
+
+    return;
+
+  }
+
+
+  $("queue").innerHTML =
+    allClips.map(
+      item => `
+
+      <div class="clip">
+
+        <div>
+
+          <strong>
+            ${escapeHTML(
+              item.clip.name
+            )}
+          </strong>
+
+          <div class="small">
+
+            ${escapeHTML(
+              item.session.game
+            )}
+
+            ·
+
+            ${Math.floor(
+              item.clip.start
+            )}s –
+
+            ${Math.floor(
+              item.clip.end
+            )}s
+
+          </div>
+
+        </div>
+
+
+        <div class="actions">
+
+          <button
+            class="${
+              item.clip.yt
+              ? "green"
+              : ""
+            }"
+            onclick="
+              toggleYouTube(
+                ${item.sessionIndex},
+                ${item.clipIndex}
+              )
+            "
+          >
+
+            ${
+              item.clip.yt
+              ? "Uploaded"
+              : "YouTube"
+            }
+
+          </button>
+
+
+          <button
+            class="${
+              item.clip.ig
+              ? "green"
+              : ""
+            }"
+            onclick="
+              toggleInstagram(
+                ${item.sessionIndex},
+                ${item.clipIndex}
+              )
+            "
+          >
+
+            ${
+              item.clip.ig
+              ? "Uploaded"
+              : "Instagram"
+            }
+
+          </button>
+
+
+          <button
+            class="alt"
+            onclick="
+              downloadClip(
+                ${item.sessionIndex},
+                ${item.clipIndex}
+              )
+            "
+          >
+
+            Download
+
+          </button>
+
+        </div>
+
+      </div>
+
+    `
+    ).join("");
+
+}
+
+
+/* MUSIC */
+
+function renderMusic(){
+
+  $("music").innerHTML =
+    MUSIC.map(
+      (track,index) => {
+
+        const isUsed =
+          usedMusic.includes(
+            index
+          );
+
+
+        return `
+
+          <div class="track">
+
+            <div class="row">
+
+              <div
+                style="font-size:38px"
+              >
+                💿
+              </div>
+
+
+              <div
+                style="flex:1"
+              >
+
+                <strong>
+                  ${track.title}
+                </strong>
+
+                <div class="small">
+                  ${track.artist}
+                </div>
+
+                <div class="small">
+                  Best:
+                  ${track.time}
+                </div>
+
+                <a
+                  href="${track.link}"
+                  target="_blank"
+                >
+                  Open Track
+                </a>
+
+              </div>
+
+
+              <button
+                class="${
+                  isUsed
+                  ? "green"
+                  : ""
+                }"
+                onclick="
+                  toggleMusic(${index})
+                "
+              >
+
+                ${
+                  isUsed
+                  ? "Used"
+                  : "Unused"
+                }
+
+              </button>
+
+            </div>
+
+          </div>
+
+        `;
+
+      }
+    ).join("");
+
+}
+
+
+window.toggleMusic =
+  index => {
+
+    if(
+      usedMusic.includes(
+        index
+      )
+    ){
+
+      usedMusic =
+        usedMusic.filter(
+          item =>
+            item !== index
+        );
+
+    }
+    else{
+
+      usedMusic.push(
+        index
+      );
+
+    }
+
+
+    saveData();
+
+  };
+
+
+$("shuffleMusic").onclick =
+  () => {
+
+    const available =
+      MUSIC.filter(
+        (_,index) =>
+          !usedMusic.includes(
+            index
+          )
+      );
+
+
+    const track =
+      available.length
+      ? available[
+          Math.floor(
+            Math.random() *
+            available.length
+          )
+        ]
+      : MUSIC[
+          Math.floor(
+            Math.random() *
+            MUSIC.length
+          )
+        ];
+
+
+    alert(
+      `🎵 ${track.title}\n` +
+      `${track.artist}\n` +
+      `Best section: ${track.time}`
+    );
+
+  };
+
+
+/* CAPTIONS */
+
+function renderCaptions(){
+
+  $("captions").innerHTML =
+    CAPTIONS.map(
+      caption => `
+
+        <button
+          class="alt"
+          style="margin:4px"
+          onclick="
+            navigator.clipboard &&
+            navigator.clipboard.writeText(
+              ${JSON.stringify(
+                caption
+              )}
+            )
+          "
+        >
+
+          ${escapeHTML(
+            caption
+          )}
+
+        </button>
+
+      `
+    ).join("");
+
+}
+
+
+/* RENDER */
+
+function renderAll(){
+
+  renderSessions();
+
+  renderQueue();
+
+  renderMusic();
+
+  renderCaptions();
+
+}
+
+
+renderAll();
+
+</script>
+
+</body>
+</html>
