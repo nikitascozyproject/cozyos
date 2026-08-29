@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4efe2">
 
-<title>CozyOS v1.4</title>
+<title>CozyOS v1.5</title>
 
 <style>
 
@@ -876,7 +876,7 @@ button.citrus{
     </div>
 
     <div class="header-side right">
-      v1.4 · YOUR LITTLE STUDIO
+      v1.5 · YOUR LITTLE STUDIO
     </div>
 
   </div>
@@ -1213,7 +1213,7 @@ button.citrus{
       id="modalText"
       class="small"
     >
-      Loading the video engine...
+      Preparing your WebM clip...
     </div>
 
 
@@ -1242,8 +1242,8 @@ button.citrus{
    
    • Sessions
    • Automatic 20/30/40 second clip mapping
-   • Real MP4/H.264/AAC export through FFmpeg
-   • Individual MP4 downloads
+   • Native browser WebM clip export
+   • Individual WebM downloads
    • Download All
    • One music suggestion at a time
    • Preview
@@ -1256,19 +1256,17 @@ button.citrus{
 ========================================================= */
 
 
-let FFmpegClass=null;
-let fetchFile=null;
-let toBlobURL=null;
-let ffmpeg=null;
 
-let ffmpegLoaded=false;
-let ffmpegLoading=false;
+let sessionsRaw=
+  localStorage.getItem("cozy_sessions_v15");
+
+if(!sessionsRaw){
+  sessionsRaw=localStorage.getItem("cozy_sessions_v14");
+}
 
 let sessions=
   JSON.parse(
-    localStorage.getItem(
-      "cozy_sessions_v14"
-    ) || "[]"
+    sessionsRaw || "[]"
   );
 
 let selectedFile=null;
@@ -1285,35 +1283,40 @@ const MUSIC=[
     title:"Cylinder Five",
     artist:"Chris Zabriskie",
     preview:
-      "https://www.youtube.com/results?search_query=Chris+Zabriskie+Cylinder+Five"
+      "https://www.youtube.com/results?search_query=Chris+Zabriskie+Cylinder+Five",
+    bestPart:"00:18–00:43"
   },
 
   {
     title:"Night Snow",
     artist:"Asher Fulero",
     preview:
-      "https://www.youtube.com/results?search_query=Asher+Fulero+Night+Snow"
+      "https://www.youtube.com/results?search_query=Asher+Fulero+Night+Snow",
+    bestPart:"00:24–00:52"
   },
 
   {
     title:"Morning Mandolin",
     artist:"Chris Haugen",
     preview:
-      "https://www.youtube.com/results?search_query=Chris+Haugen+Morning+Mandolin"
+      "https://www.youtube.com/results?search_query=Chris+Haugen+Morning+Mandolin",
+    bestPart:"00:12–00:39"
   },
 
   {
     title:"Quiet Time",
     artist:"Aaron Kenny",
     preview:
-      "https://www.youtube.com/results?search_query=Aaron+Kenny+Quiet+Time"
+      "https://www.youtube.com/results?search_query=Aaron+Kenny+Quiet+Time",
+    bestPart:"00:28–00:56"
   },
 
   {
     title:"Carefree",
     artist:"Kevin MacLeod",
     preview:
-      "https://www.youtube.com/results?search_query=Kevin+MacLeod+Carefree"
+      "https://www.youtube.com/results?search_query=Kevin+MacLeod+Carefree",
+    bestPart:"00:36–01:04"
   }
 
 ];
@@ -1412,7 +1415,7 @@ function formatTime(seconds){
 function save(){
 
   localStorage.setItem(
-    "cozy_sessions_v14",
+    "cozy_sessions_v15",
     JSON.stringify(
       sessions
     )
@@ -1461,692 +1464,260 @@ function hideModal(){
 
 
 /* =========================================================
-   FFmpeg
+   NATIVE WEBM EXPORT
 ========================================================= */
 
-async function loadFFmpeg(){
+function getWebMMimeType(){
 
-  if(ffmpegLoaded){
-    return ffmpeg;
-  }
+  const candidates=[
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm"
+  ];
 
-  if(ffmpegLoading){
-
-    while(ffmpegLoading){
-
-      await sleep(100);
-
-    }
-
-    return ffmpeg;
-
-  }
-
-  ffmpegLoading=true;
-
-  showModal(
-    "Loading the video engine…",
-    10
-  );
-
-  try{
-
-    const ffmpegModule=
-      await import(
-        "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm"
-      );
-
-    const utilModule=
-      await import(
-        "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm"
-      );
-
-    FFmpegClass=
-      ffmpegModule.FFmpeg;
-
-    fetchFile=
-      utilModule.fetchFile;
-
-    toBlobURL=
-      utilModule.toBlobURL;
-
-
-    ffmpeg=
-      new FFmpegClass();
-
-
-    ffmpeg.on(
-      "log",
-      ({message})=>{
-
-        console.log(
-          "[CozyOS FFmpeg]",
-          message
-        );
-
-      }
-    );
-
-
-    ffmpeg.on(
-      "progress",
-      ({progress})=>{
-
-        if(
-          progress>=0 &&
-          progress<=1
-        ){
-
-          $("progressFill")
-            .style
-            .width=
-              `${Math.round(
-                progress*100
-              )}%`;
-
-        }
-
-      }
-    );
-
-
-    const baseURL=
-      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-
-
-    /*
-     * V1.4.4:
-     * FFmpeg's wrapper worker is now hosted by CozyOS itself.
-     * This fixes the GitHub Pages cross-origin Worker restriction.
-     *
-     * classWorkerURL controls the Worker created by FFmpegClass.
-     * workerURL is NOT used here because it refers to the core's
-     * internal worker, not FFmpeg's wrapper worker.
-     */
-
-    const classWorkerURL=
-      new URL(
-        "./ffmpeg/worker.js",
-        window.location.href
-      ).href;
-
-
-    await ffmpeg.load({
-
-      classWorkerURL,
-
-      coreURL:
-        await toBlobURL(
-          `${baseURL}/ffmpeg-core.js`,
-          "text/javascript"
-        ),
-
-      wasmURL:
-        await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm`,
-          "application/wasm"
-        )
-
-    });
-
-
-    ffmpegLoaded=true;
-
-    hideModal();
-
-    return ffmpeg;
-
-  }
-  catch(error){
-
-    console.error(
-      "FFmpeg error:",
-      error
-    );
-
-    hideModal();
-
-    throw new Error(
-      "The MP4 engine could not be loaded."
-    );
-
-  }
-  finally{
-
-    ffmpegLoading=false;
-
-  }
+  return candidates.find(
+    type=>MediaRecorder.isTypeSupported(type)
+  ) || "";
 
 }
 
 
-/* =========================================================
-   SESSION CREATION
-========================================================= */
+async function waitForEvent(target,eventName){
 
-$("createSession")
-  .onclick=()=>{
+  return new Promise(
+    (resolve,reject)=>{
 
-    const name=
-      $("gameInput")
-        .value
-        .trim();
+      const onResolve=()=>{
+        cleanup();
+        resolve();
+      };
 
+      const onReject=()=>{
+        cleanup();
+        reject(new Error("Video could not be prepared."));
+      };
 
-    if(!name){
+      const cleanup=()=>{
+        target.removeEventListener(eventName,onResolve);
+        target.removeEventListener("error",onReject);
+      };
 
-      alert(
-        "Enter a game name first."
-      );
-
-      return;
-
-    }
-
-
-    sessions.unshift({
-
-      game:name,
-
-      date:
-        new Date()
-          .toLocaleDateString(),
-
-      clips:[]
-
-    });
-
-
-    $("gameInput")
-      .value="";
-
-
-    save();
-
-  };
-
-
-/* =========================================================
-   FILE PICKER
-========================================================= */
-
-$("dropZone")
-  .onclick=()=>
-    $("videoInput").click();
-
-
-$("videoInput")
-  .onchange=e=>
-    chooseFile(
-      e.target.files[0]
-    );
-
-
-[
-  "dragenter",
-  "dragover"
-]
-.forEach(
-  eventName=>{
-
-    $("dropZone")
-      .addEventListener(
-        eventName,
-        event=>{
-
-          event.preventDefault();
-
-          $("dropZone")
-            .classList
-            .add("drag");
-
-        }
-      );
-
-  }
-);
-
-
-[
-  "dragleave",
-  "drop"
-]
-.forEach(
-  eventName=>{
-
-    $("dropZone")
-      .addEventListener(
-        eventName,
-        event=>{
-
-          event.preventDefault();
-
-          $("dropZone")
-            .classList
-            .remove("drag");
-
-        }
-      );
-
-  }
-);
-
-
-$("dropZone")
-  .addEventListener(
-    "drop",
-    event=>{
-
-      chooseFile(
-        event
-          .dataTransfer
-          .files[0]
-      );
+      target.addEventListener(eventName,onResolve,{once:true});
+      target.addEventListener("error",onReject,{once:true});
 
     }
-  );
-
-
-function chooseFile(file){
-
-  if(!file){
-    return;
-  }
-
-
-  if(
-    !file.type.startsWith(
-      "video/"
-    )
-  ){
-
-    alert(
-      "Please choose a video file."
-    );
-
-    return;
-
-  }
-
-
-  selectedFile=file;
-
-
-  $("fileName")
-    .textContent=
-      file.name;
-
-
-  $("makeClips")
-    .disabled=false;
-
-
-  updateStatus(
-    "Ready. Choose your clip length and make your clips."
   );
 
 }
 
 
-/* =========================================================
-   CREATE CLIPS
-========================================================= */
-
-$("makeClips")
-  .onclick=
-  async()=>{
-
-    if(!selectedFile){
-      return;
-    }
-
-
-    if(!sessions.length){
-
-      alert(
-        "Create a session first."
-      );
-
-      return;
-
-    }
-
-
-    const sessionIndex=
-      Number(
-        $("sessionSelect")
-          .value
-      );
-
-
-    const clipLength=
-      Number(
-        $("clipLength")
-          .value
-      );
-
-
-    const video=
-      document.createElement(
-        "video"
-      );
-
-
-    const objectURL=
-      URL.createObjectURL(
-        selectedFile
-      );
-
-
-    video.preload="metadata";
-    video.src=objectURL;
-
-
-    $("makeClips")
-      .disabled=true;
-
-
-    try{
-
-      await new Promise(
-        (
-          resolve,
-          reject
-        )=>{
-
-          video.onloadedmetadata=
-            resolve;
-
-          video.onerror=
-            reject;
-
-        }
-      );
-
-
-      const duration=
-        video.duration;
-
-
-      if(
-        !Number.isFinite(
-          duration
-        ) ||
-        duration<=0
-      ){
-
-        throw new Error(
-          "Invalid video."
-        );
-
-      }
-
-
-      const total=
-        Math.ceil(
-          duration/
-          clipLength
-        );
-
-
-      sessions[
-        sessionIndex
-      ].clips=[];
-
-
-      for(
-        let i=0;
-        i<total;
-        i++
-      ){
-
-        const start=
-          i*
-          clipLength;
-
-
-        const end=
-          Math.min(
-            start+
-            clipLength,
-            duration
-          );
-
-
-        sessions[
-          sessionIndex
-        ].clips.push({
-
-          name:
-            `${safeFilename(
-              sessions[
-                sessionIndex
-              ].game
-            )}_clip_${String(
-              i+1
-            ).padStart(
-              2,
-              "0"
-            )}.mp4`,
-
-          start,
-
-          end,
-
-          duration:
-            end-start,
-
-          yt:false,
-
-          ig:false,
-
-          musicIndex:
-            i%
-            MUSIC.length,
-
-          musicChoice:
-            "pending"
-
-        });
-
-
-        $("progressFill")
-          .style
-          .width=
-            `${Math.round(
-              ((i+1)/total)*
-              100
-            )}%`;
-
-
-        $("progressText")
-          .textContent=
-            `Prepared ${i+1} of ${total} clips`;
-
-
-        await sleep(0);
-
-      }
-
-
-      updateStatus(
-        `${total} clips are ready.`
-      );
-
-
-      save();
-
-    }
-    catch(error){
-
-      console.error(
-        error
-      );
-
-
-      updateStatus(
-        "CozyOS couldn't read this video."
-      );
-
-
-      alert(
-        "I couldn't read this video. Try a standard MP4 or MOV recording."
-      );
-
-    }
-    finally{
-
-      URL.revokeObjectURL(
-        objectURL
-      );
-
-
-      $("makeClips")
-        .disabled=false;
-
-    }
-
-  };
-
-
-/* =========================================================
-   MP4 EXPORT
-========================================================= */
-
-async function exportClip(
-  clip
-){
+async function exportClip(clip){
 
   if(!selectedFile){
-
-    throw new Error(
-      "Original video missing."
-    );
-
+    throw new Error("Original video missing.");
   }
 
+  if(!window.MediaRecorder){
+    throw new Error("This browser does not support video recording.");
+  }
 
-  const engine=
-    await loadFFmpeg();
+  if(!HTMLCanvasElement.prototype.captureStream){
+    throw new Error("This browser cannot create a WebM clip from a video.");
+  }
 
+  const mimeType=getWebMMimeType();
 
-  const extension=
-    (
-      selectedFile.name
-        .match(
-          /\.[^.]+$/
-        )
-      ||
-      [".mp4"]
-    )[0];
+  if(!mimeType){
+    throw new Error("This browser cannot create WebM video.");
+  }
 
+  const video=document.createElement("video");
+  const canvas=document.createElement("canvas");
+  const objectURL=URL.createObjectURL(selectedFile);
 
-  const inputName=
-    "cozy_input"+
-    extension;
-
-
-  const outputName=
-    "cozy_output.mp4";
-
+  video.src=objectURL;
+  video.preload="auto";
+  video.playsInline=true;
+  video.muted=true;
 
   try{
 
-    await engine.writeFile(
-      inputName,
-      await fetchFile(
-        selectedFile
-      )
+    await waitForEvent(video,"loadedmetadata");
+
+    const width=video.videoWidth || 1280;
+    const height=video.videoHeight || 720;
+
+    canvas.width=width;
+    canvas.height=height;
+
+    const ctx=canvas.getContext("2d",{alpha:false});
+    if(!ctx){
+      throw new Error("Could not prepare the video canvas.");
+    }
+
+    const canvasStream=canvas.captureStream(30);
+
+    let audioContext=null;
+    let audioDestination=null;
+
+    try{
+      audioContext=new (window.AudioContext || window.webkitAudioContext)();
+      audioDestination=audioContext.createMediaStreamDestination();
+      const audioSource=audioContext.createMediaElementSource(video);
+      audioSource.connect(audioDestination);
+    }
+    catch(_){
+      audioContext=null;
+      audioDestination=null;
+    }
+
+    if(audioContext && audioContext.state==="suspended"){
+      await audioContext.resume();
+    }
+
+    const outputStream=new MediaStream();
+
+    canvasStream.getVideoTracks().forEach(
+      track=>outputStream.addTrack(track)
     );
 
+    if(audioDestination){
+      audioDestination.stream
+        .getAudioTracks()
+        .forEach(track=>outputStream.addTrack(track));
+    }
 
-    await engine.exec([
-
-      "-ss",
-      String(
-        clip.start
-      ),
-
-      "-i",
-      inputName,
-
-      "-t",
-      String(
-        clip.duration
-      ),
-
-      "-map",
-      "0:v:0",
-
-      "-map",
-      "0:a:0?",
-
-      "-c:v",
-      "libx264",
-
-      "-preset",
-      "medium",
-
-      "-crf",
-      "18",
-
-      "-pix_fmt",
-      "yuv420p",
-
-      "-c:a",
-      "aac",
-
-      "-b:a",
-      "192k",
-
-      "-movflags",
-      "+faststart",
-
-      "-avoid_negative_ts",
-      "make_zero",
-
-      outputName
-
-    ]);
-
-
-    const data=
-      await engine.readFile(
-        outputName
-      );
-
-
-    return new Blob(
-      [
-        data.buffer
-      ],
+    const recorder=new MediaRecorder(
+      outputStream,
       {
-        type:
-          "video/mp4"
+        mimeType,
+        videoBitsPerSecond:Math.min(
+          20_000_000,
+          Math.max(8_000_000,width*height*4)
+        )
       }
     );
+
+    const chunks=[];
+    recorder.ondataavailable=event=>{
+      if(event.data && event.data.size){
+        chunks.push(event.data);
+      }
+    };
+
+    const recordingFinished=new Promise(
+      (resolve,reject)=>{
+        recorder.onstop=resolve;
+        recorder.onerror=event=>reject(
+          event.error || new Error("WebM recording failed.")
+        );
+      }
+    );
+
+    const start=Math.max(0,Number(clip.start)||0);
+    const end=Math.min(
+      video.duration,
+      Number(clip.end)||video.duration
+    );
+
+    if(end<=start){
+      throw new Error("Invalid clip range.");
+    }
+
+    video.currentTime=start;
+    await waitForEvent(video,"seeked");
+
+    let drawing=true;
+    let animationFrame=0;
+    let stopTimer=0;
+
+    const draw=()=>{
+      if(!drawing) return;
+
+      ctx.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      const elapsed=Math.max(
+        0,
+        Math.min(end-start,video.currentTime-start)
+      );
+
+      $("progressFill").style.width=
+        `${Math.round((elapsed/(end-start))*100)}%`;
+
+      animationFrame=requestAnimationFrame(draw);
+    };
+
+    const finish=()=>{
+      if(!drawing) return;
+
+      drawing=false;
+      cancelAnimationFrame(animationFrame);
+      clearTimeout(stopTimer);
+
+      try{video.pause();}catch(_){ }
+
+      if(recorder.state!=="inactive"){
+        recorder.stop();
+      }
+    };
+
+    ctx.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    recorder.start(250);
+    draw();
+
+    await video.play();
+    video.muted=false;
+
+    const watchEnd=()=>{
+      if(video.currentTime>=end-0.04){
+        finish();
+        return;
+      }
+      requestAnimationFrame(watchEnd);
+    };
+
+    watchEnd();
+
+    stopTimer=setTimeout(
+      finish,
+      Math.max(250,(end-start+0.5)*1000)
+    );
+
+    await recordingFinished;
+
+    const blob=new Blob(
+      chunks,
+      {type:mimeType}
+    );
+
+    if(!blob.size){
+      throw new Error("The WebM clip was empty.");
+    }
+
+    return blob;
 
   }
   finally{
 
-    try{
+    URL.revokeObjectURL(objectURL);
 
-      await engine.deleteFile(
-        inputName
-      );
+    try{video.pause();}catch(_){ }
 
-    }
-    catch(_){}
-
-
-    try{
-
-      await engine.deleteFile(
-        outputName
-      );
-
-    }
-    catch(_){}
+    video.removeAttribute("src");
+    video.load();
 
   }
 
@@ -2167,17 +1738,12 @@ window.downloadClip=
       return;
     }
 
-
     if(!selectedFile){
-
       alert(
         "Please upload the original recording again."
       );
-
       return;
-
     }
-
 
     const clip=
       sessions[
@@ -2186,112 +1752,50 @@ window.downloadClip=
         clipIndex
       ];
 
-
     exportBusy=true;
-
-
-    $("downloadAll")
-      .disabled=true;
-
+    $("downloadAll").disabled=true;
 
     try{
 
-      $("progressFill")
-        .style
-        .width="0%";
+      $("progressFill").style.width="0%";
+      $("progressText").textContent="Preparing WebM…";
+      updateStatus(`Making ${clip.name}…`);
 
+      showModal("Preparing your WebM clip…",0);
 
-      $("progressText")
-        .textContent=
-          "Preparing MP4…";
+      const blob=await exportClip(clip);
 
-
-      updateStatus(
-        `Making ${clip.name}…`
-      );
-
-
-      const blob=
-        await exportClip(
-          clip
-        );
-
-
-      const url=
-        URL.createObjectURL(
-          blob
-        );
-
-
-      const link=
-        document.createElement(
-          "a"
-        );
-
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
 
       link.href=url;
-
-      link.download=
-        clip.name;
-
-
-      document.body
-        .appendChild(
-          link
-        );
-
-
+      link.download=clip.name;
+      document.body.appendChild(link);
       link.click();
-
       link.remove();
 
+      await sleep(500);
+      URL.revokeObjectURL(url);
 
-      await sleep(1500);
-
-
-      URL.revokeObjectURL(
-        url
-      );
-
-
-      $("progressFill")
-        .style
-        .width="100%";
-
-
-      $("progressText")
-        .textContent=
-          "Finished.";
-
-
-      updateStatus(
-        `${clip.name} downloaded as MP4.`
-      );
+      $("progressFill").style.width="100%";
+      $("progressText").textContent="Finished.";
+      updateStatus(`${clip.name} downloaded as WebM.`);
 
     }
     catch(error){
 
-      console.error(
-        error
-      );
-
-
-      updateStatus(
-        "MP4 export failed."
-      );
-
-
+      console.error(error);
+      updateStatus("WebM export failed.");
       alert(
-        "CozyOS couldn't create the MP4. Try reloading the page and trying again."
+        "CozyOS couldn't create the WebM clip. Try reloading the page and trying again."
       );
 
     }
     finally{
 
+      hideModal();
       exportBusy=false;
-
-      $("downloadAll")
-        .disabled=false;
+      $("downloadAll").disabled=false;
 
     }
 
@@ -2310,20 +1814,14 @@ $("downloadAll")
       return;
     }
 
-
     if(!selectedFile){
-
       alert(
         "Please upload the original recording first."
       );
-
       return;
-
     }
 
-
     const jobs=[];
-
 
     sessions.forEach(
       (
@@ -2331,143 +1829,69 @@ $("downloadAll")
         sessionIndex
       )=>{
 
-        (
-          session.clips||
-          []
-        ).forEach(
+        (session.clips||[]).forEach(
           (
             clip,
             clipIndex
           )=>{
-
-            jobs.push({
-
-              sessionIndex,
-
-              clipIndex,
-
-              clip
-
-            });
-
+            jobs.push({sessionIndex,clipIndex,clip});
           }
         );
 
       }
     );
 
-
     if(!jobs.length){
-
-      alert(
-        "There are no clips yet."
-      );
-
+      alert("There are no clips yet.");
       return;
-
     }
 
-
     exportBusy=true;
-
-    $("downloadAll")
-      .disabled=true;
-
+    $("downloadAll").disabled=true;
 
     try{
 
-      for(
-        let i=0;
-        i<jobs.length;
-        i++
-      ){
+      for(let i=0;i<jobs.length;i++){
 
-        const job=
-          jobs[i];
-
+        const job=jobs[i];
 
         updateStatus(
           `Making clip ${i+1} of ${jobs.length}…`
         );
 
+        $("progressFill").style.width="0%";
+        $("progressText").textContent=
+          `Preparing WebM ${i+1} of ${jobs.length}…`;
 
-        const blob=
-          await exportClip(
-            job.clip
-          );
-
-
-        const url=
-          URL.createObjectURL(
-            blob
-          );
-
-
-        const link=
-          document.createElement(
-            "a"
-          );
-
-
-        link.href=url;
-
-        link.download=
-          job.clip.name;
-
-
-        document.body
-          .appendChild(
-            link
-          );
-
-
-        link.click();
-
-        link.remove();
-
-
-        await sleep(1500);
-
-
-        URL.revokeObjectURL(
-          url
+        showModal(
+          `Preparing WebM clip ${i+1} of ${jobs.length}…`,
+          Math.round((i/jobs.length)*100)
         );
 
+        const blob=await exportClip(job.clip);
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement("a");
 
-        $("progressFill")
-          .style
-          .width=
-            `${Math.round(
-              ((i+1)/
-              jobs.length)*
-              100
-            )}%`;
+        link.href=url;
+        link.download=job.clip.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        await sleep(700);
+        URL.revokeObjectURL(url);
 
       }
 
-
-      $("progressText")
-        .textContent=
-          "All done.";
-
-
-      updateStatus(
-        `All ${jobs.length} clips are ready.`
-      );
+      $("progressFill").style.width="100%";
+      $("progressText").textContent="Finished.";
+      updateStatus("All clips downloaded as WebM.");
 
     }
     catch(error){
 
-      console.error(
-        error
-      );
-
-
-      updateStatus(
-        "Download All stopped."
-      );
-
-
+      console.error(error);
+      updateStatus("Download All stopped.");
       alert(
         "One of the clips could not be exported. The clips already downloaded are safe."
       );
@@ -2475,10 +1899,9 @@ $("downloadAll")
     }
     finally{
 
+      hideModal();
       exportBusy=false;
-
-      $("downloadAll")
-        .disabled=false;
+      $("downloadAll").disabled=false;
 
     }
 
@@ -2636,6 +2059,12 @@ function renderMusic(
         ${escapeHTML(
           song.artist
         )}
+      </div>
+
+      <div class="music-note">
+        Best part: <strong>${escapeHTML(song.bestPart)}</strong>
+        <br>
+        Open the song, jump to this section, and add it in the platform app.
       </div>
 
 
@@ -2941,7 +2370,7 @@ function renderQueue(){
                   )
                 "
               >
-                Download MP4
+                Download WebM
               </button>
 
 
