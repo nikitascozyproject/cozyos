@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4efe2">
 
-<title>CozyOS v1.4.1</title>
+<title>CozyOS v1.4</title>
 
 <style>
 
@@ -876,7 +876,7 @@ button.citrus{
     </div>
 
     <div class="header-side right">
-      v1.4.1 · YOUR LITTLE STUDIO
+      v1.4 · YOUR LITTLE STUDIO
     </div>
 
   </div>
@@ -1235,7 +1235,7 @@ button.citrus{
 
 
 /* =========================================================
-   COZYOS v1.4.1
+   COZYOS v1.4
    =========================================================
    
    Functionality:
@@ -1465,190 +1465,62 @@ function hideModal(){
 ========================================================= */
 
 async function loadFFmpeg(){
+  if(ffmpegLoaded) return;
 
-  if(ffmpegLoaded){
-    return ffmpeg;
+  // V1.4.2: keep the FFmpeg root worker same-origin with GitHub Pages.
+  // The browser blocks cross-origin Worker() construction from jsDelivr.
+  if(!window.FFmpeg || !window.FFmpegUtil){
+    throw new Error("FFmpeg libraries did not load.");
   }
 
-  if(ffmpegLoading){
+  const { FFmpeg } = window.FFmpeg;
+  const { fetchFile, toBlobURL } = window.FFmpegUtil;
 
-    while(ffmpegLoading){
+  ffmpeg = new FFmpeg();
 
-      await sleep(100);
+  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
 
-    }
-
-    return ffmpeg;
-
+  // Download the worker script and create a same-origin Blob URL.
+  // This avoids SecurityError when GitHub Pages creates the Worker.
+  const workerResponse = await fetch(
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js",
+    { mode: "cors" }
+  );
+  if(!workerResponse.ok){
+    throw new Error(`FFmpeg worker fetch failed: ${workerResponse.status}`);
   }
 
-  ffmpegLoading=true;
+  const workerText = await workerResponse.text();
 
-  showModal(
-    "Loading the video engine…",
-    10
+  // Rewrite the worker's dynamic import to a same-origin Blob URL
+  // containing the FFmpeg package module.
+  const ffmpegModuleResponse = await fetch(
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js",
+    { mode: "cors" }
+  );
+  if(!ffmpegModuleResponse.ok){
+    throw new Error(`FFmpeg module fetch failed: ${ffmpegModuleResponse.status}`);
+  }
+
+  const ffmpegModuleText = await ffmpegModuleResponse.text();
+  const moduleBlob = new Blob([ffmpegModuleText], {type:"text/javascript"});
+  const moduleURL = URL.createObjectURL(moduleBlob);
+
+  const patchedWorkerText = workerText.replace(
+    /from\s+["']\.\/worker\.js["']/g,
+    `from "${moduleURL}"`
   );
 
-  try{
+  const workerBlob = new Blob([patchedWorkerText], {type:"text/javascript"});
+  const workerURL = URL.createObjectURL(workerBlob);
 
-    const ffmpegModule=
-      await import(
-        "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm"
-      );
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL
+  });
 
-    const utilModule=
-      await import(
-        "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm"
-      );
-
-    FFmpegClass=
-      ffmpegModule.FFmpeg;
-
-    fetchFile=
-      utilModule.fetchFile;
-
-    toBlobURL=
-      utilModule.toBlobURL;
-
-
-    ffmpeg=
-      new FFmpegClass();
-
-
-    ffmpeg.on(
-      "log",
-      ({message})=>{
-
-        console.log(
-          "[CozyOS FFmpeg]",
-          message
-        );
-
-      }
-    );
-
-
-    ffmpeg.on(
-      "progress",
-      ({progress})=>{
-
-        if(
-          progress>=0 &&
-          progress<=1
-        ){
-
-          $("progressFill")
-            .style
-            .width=
-              `${Math.round(
-                progress*100
-              )}%`;
-
-        }
-
-      }
-    );
-
-
-    const baseURL=
-      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-
-
-    /*
-       GitHub Pages is a different origin from jsDelivr.
-       @ffmpeg/ffmpeg creates its essential worker from worker.js,
-       and Chrome blocks that cross-origin Worker.
-
-       We fetch that worker, rewrite its two local module imports to
-       absolute jsDelivr URLs, and then create a same-origin-compatible
-       Blob URL for the Worker. This fixes the Worker origin error without
-       changing the actual video encoding settings.
-    */
-
-    const workerBaseURL=
-      "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm";
-
-    const workerResponse=
-      await fetch(
-        `${workerBaseURL}/worker.js`,
-        { cache: "no-store" }
-      );
-
-    if(!workerResponse.ok){
-      throw new Error(
-        `Could not load FFmpeg worker (${workerResponse.status}).`
-      );
-    }
-
-    let workerSource=
-      await workerResponse.text();
-
-    workerSource=
-      workerSource
-        .replace(
-          /from\s+["']\.\/const\.js["']/g,
-          `from "${workerBaseURL}/const.js"`
-        )
-        .replace(
-          /from\s+["']\.\/errors\.js["']/g,
-          `from "${workerBaseURL}/errors.js"`
-        );
-
-    const classWorkerURL=
-      URL.createObjectURL(
-        new Blob(
-          [workerSource],
-          { type: "text/javascript" }
-        )
-      );
-
-
-    await ffmpeg.load({
-
-      coreURL:
-        await toBlobURL(
-          `${baseURL}/ffmpeg-core.js`,
-          "text/javascript"
-        ),
-
-      wasmURL:
-        await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm`,
-          "application/wasm"
-        ),
-
-      classWorkerURL
-
-    });
-
-
-    ffmpegLoaded=true;
-
-    hideModal();
-
-    return ffmpeg;
-
-  }
-  catch(error){
-
-    console.error(
-      "FFmpeg error:",
-      error
-    );
-
-    hideModal();
-
-    throw new Error(
-      "The MP4 engine could not be loaded."
-    );
-
-  }
-  finally{
-
-    ffmpegLoading=false;
-
-  }
-
+  ffmpegLoaded = true;
 }
 
 
