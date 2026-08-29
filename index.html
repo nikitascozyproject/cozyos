@@ -1467,56 +1467,35 @@ function hideModal(){
 async function loadFFmpeg(){
   if(ffmpegLoaded) return;
 
-  // V1.4.2: keep the FFmpeg root worker same-origin with GitHub Pages.
-  // The browser blocks cross-origin Worker() construction from jsDelivr.
   if(!window.FFmpeg || !window.FFmpegUtil){
     throw new Error("FFmpeg libraries did not load.");
   }
 
   const { FFmpeg } = window.FFmpeg;
-  const { fetchFile, toBlobURL } = window.FFmpegUtil;
+  const { toBlobURL } = window.FFmpegUtil;
 
   ffmpeg = new FFmpeg();
 
-  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+  const baseURL =
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
 
-  // Download the worker script and create a same-origin Blob URL.
-  // This avoids SecurityError when GitHub Pages creates the Worker.
-  const workerResponse = await fetch(
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js",
-    { mode: "cors" }
-  );
-  if(!workerResponse.ok){
-    throw new Error(`FFmpeg worker fetch failed: ${workerResponse.status}`);
-  }
-
-  const workerText = await workerResponse.text();
-
-  // Rewrite the worker's dynamic import to a same-origin Blob URL
-  // containing the FFmpeg package module.
-  const ffmpegModuleResponse = await fetch(
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js",
-    { mode: "cors" }
-  );
-  if(!ffmpegModuleResponse.ok){
-    throw new Error(`FFmpeg module fetch failed: ${ffmpegModuleResponse.status}`);
-  }
-
-  const ffmpegModuleText = await ffmpegModuleResponse.text();
-  const moduleBlob = new Blob([ffmpegModuleText], {type:"text/javascript"});
-  const moduleURL = URL.createObjectURL(moduleBlob);
-
-  const patchedWorkerText = workerText.replace(
-    /from\s+["']\.\/worker\.js["']/g,
-    `from "${moduleURL}"`
+  const coreURL = await toBlobURL(
+    `${baseURL}/ffmpeg-core.js`,
+    "text/javascript"
   );
 
-  const workerBlob = new Blob([patchedWorkerText], {type:"text/javascript"});
-  const workerURL = URL.createObjectURL(workerBlob);
+  const wasmURL = await toBlobURL(
+    `${baseURL}/ffmpeg-core.wasm`,
+    "application/wasm"
+  );
+
+  // Load the FFmpeg worker from the same GitHub Pages origin.
+  const workerURL =
+    new URL("./ffmpeg/worker.js", window.location.href).href;
 
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    coreURL,
+    wasmURL,
     workerURL
   });
 
