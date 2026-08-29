@@ -1235,7 +1235,7 @@ button.citrus{
 
 
 /* =========================================================
-   COZYOS v1.4
+   COZYOS v1.5
    =========================================================
    
    Functionality:
@@ -1461,6 +1461,200 @@ function hideModal(){
     .add("hidden");
 
 }
+
+
+
+/* =========================================================
+   SESSION CREATION
+========================================================= */
+
+$("createSession").onclick=()=>{
+
+  const name=$("gameInput").value.trim();
+
+  if(!name){
+    alert("Enter a game name first.");
+    return;
+  }
+
+  sessions.unshift({
+    game:name,
+    date:new Date().toLocaleDateString(),
+    clips:[]
+  });
+
+  $("gameInput").value="";
+  save();
+
+};
+
+
+/* =========================================================
+   FILE PICKER
+========================================================= */
+
+$("dropZone").onclick=()=>{
+  $("videoInput").click();
+};
+
+$("videoInput").onchange=e=>{
+  chooseFile(e.target.files[0]);
+};
+
+["dragenter","dragover"].forEach(eventName=>{
+  $("dropZone").addEventListener(eventName,event=>{
+    event.preventDefault();
+    $("dropZone").classList.add("drag");
+  });
+});
+
+["dragleave","drop"].forEach(eventName=>{
+  $("dropZone").addEventListener(eventName,event=>{
+    event.preventDefault();
+    $("dropZone").classList.remove("drag");
+  });
+});
+
+$("dropZone").addEventListener("drop",event=>{
+  chooseFile(event.dataTransfer.files[0]);
+});
+
+function chooseFile(file){
+
+  if(!file){
+    return;
+  }
+
+  if(!file.type.startsWith("video/")){
+    alert("Please choose a video file.");
+    return;
+  }
+
+  selectedFile=file;
+
+  $("fileName").textContent=file.name;
+  $("makeClips").disabled=false;
+
+  updateStatus(
+    "Ready. Choose your clip length and make your clips."
+  );
+
+}
+
+
+/* =========================================================
+   CLIP CREATION
+========================================================= */
+
+$("makeClips").onclick=async()=>{
+
+  if(!selectedFile){
+    alert("Choose a recording first.");
+    return;
+  }
+
+  if(!sessions.length){
+    alert("Start a session first.");
+    return;
+  }
+
+  const sessionIndex=Number($("sessionSelect").value);
+  const clipLength=Number($("clipLength").value);
+
+  if(!Number.isInteger(sessionIndex) || !sessions[sessionIndex]){
+    alert("Choose a session first.");
+    return;
+  }
+
+  const video=document.createElement("video");
+  const objectURL=URL.createObjectURL(selectedFile);
+
+  video.preload="metadata";
+  video.src=objectURL;
+
+  $("makeClips").disabled=true;
+
+  try{
+
+    await new Promise((resolve,reject)=>{
+
+      video.onloadedmetadata=resolve;
+      video.onerror=reject;
+
+    });
+
+    const duration=video.duration;
+
+    if(!Number.isFinite(duration) || duration<=0){
+      throw new Error("Invalid video.");
+    }
+
+    const total=Math.ceil(duration/clipLength);
+
+    sessions[sessionIndex].clips=[];
+
+    for(let i=0;i<total;i++){
+
+      const start=i*clipLength;
+      const end=Math.min(
+        start+clipLength,
+        duration
+      );
+
+      sessions[sessionIndex].clips.push({
+
+        name:
+          `${safeFilename(
+            sessions[sessionIndex].game
+          )}_clip_${String(i+1).padStart(2,"0")}.webm`,
+
+        start,
+        end,
+        duration:end-start,
+
+        yt:false,
+        ig:false,
+
+        musicIndex:i%MUSIC.length,
+        musicChoice:"pending"
+
+      });
+
+      $("progressFill").style.width=
+        `${Math.round(((i+1)/total)*100)}%`;
+
+      $("progressText").textContent=
+        `Prepared ${i+1} of ${total} clips`;
+
+      await sleep(0);
+
+    }
+
+    updateStatus(`${total} clips are ready.`);
+    save();
+
+  }
+  catch(error){
+
+    console.error(error);
+
+    updateStatus(
+      "CozyOS couldn't read this video."
+    );
+
+    alert(
+      "I couldn't read this video. Try a standard MP4 or MOV recording."
+    );
+
+  }
+  finally{
+
+    URL.revokeObjectURL(objectURL);
+    $("makeClips").disabled=false;
+
+  }
+
+};
 
 
 /* =========================================================
