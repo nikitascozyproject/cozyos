@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4efe2">
 
-<title>CozyOS v1.4</title>
+<title>CozyOS v1.4.1</title>
 
 <style>
 
@@ -876,7 +876,7 @@ button.citrus{
     </div>
 
     <div class="header-side right">
-      v1.4 · YOUR LITTLE STUDIO
+      v1.4.1 · YOUR LITTLE STUDIO
     </div>
 
   </div>
@@ -1235,7 +1235,7 @@ button.citrus{
 
 
 /* =========================================================
-   COZYOS v1.4
+   COZYOS v1.4.1
    =========================================================
    
    Functionality:
@@ -1554,6 +1554,55 @@ async function loadFFmpeg(){
       "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
 
 
+    /*
+       GitHub Pages is a different origin from jsDelivr.
+       @ffmpeg/ffmpeg creates its essential worker from worker.js,
+       and Chrome blocks that cross-origin Worker.
+
+       We fetch that worker, rewrite its two local module imports to
+       absolute jsDelivr URLs, and then create a same-origin-compatible
+       Blob URL for the Worker. This fixes the Worker origin error without
+       changing the actual video encoding settings.
+    */
+
+    const workerBaseURL=
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm";
+
+    const workerResponse=
+      await fetch(
+        `${workerBaseURL}/worker.js`,
+        { cache: "no-store" }
+      );
+
+    if(!workerResponse.ok){
+      throw new Error(
+        `Could not load FFmpeg worker (${workerResponse.status}).`
+      );
+    }
+
+    let workerSource=
+      await workerResponse.text();
+
+    workerSource=
+      workerSource
+        .replace(
+          /from\s+["']\.\/const\.js["']/g,
+          `from "${workerBaseURL}/const.js"`
+        )
+        .replace(
+          /from\s+["']\.\/errors\.js["']/g,
+          `from "${workerBaseURL}/errors.js"`
+        );
+
+    const classWorkerURL=
+      URL.createObjectURL(
+        new Blob(
+          [workerSource],
+          { type: "text/javascript" }
+        )
+      );
+
+
     await ffmpeg.load({
 
       coreURL:
@@ -1566,7 +1615,9 @@ async function loadFFmpeg(){
         await toBlobURL(
           `${baseURL}/ffmpeg-core.wasm`,
           "application/wasm"
-        )
+        ),
+
+      classWorkerURL
 
     });
 
