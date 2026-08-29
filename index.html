@@ -1465,41 +1465,158 @@ function hideModal(){
 ========================================================= */
 
 async function loadFFmpeg(){
-  if(ffmpegLoaded) return;
 
-  if(!window.FFmpeg || !window.FFmpegUtil){
-    throw new Error("FFmpeg libraries did not load.");
+  if(ffmpegLoaded){
+    return ffmpeg;
   }
 
-  const { FFmpeg } = window.FFmpeg;
-  const { toBlobURL } = window.FFmpegUtil;
+  if(ffmpegLoading){
 
-  ffmpeg = new FFmpeg();
+    while(ffmpegLoading){
 
-  const baseURL =
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+      await sleep(100);
 
-  const coreURL = await toBlobURL(
-    `${baseURL}/ffmpeg-core.js`,
-    "text/javascript"
+    }
+
+    return ffmpeg;
+
+  }
+
+  ffmpegLoading=true;
+
+  showModal(
+    "Loading the video engine…",
+    10
   );
 
-  const wasmURL = await toBlobURL(
-    `${baseURL}/ffmpeg-core.wasm`,
-    "application/wasm"
-  );
+  try{
 
-  // Load the FFmpeg worker from the same GitHub Pages origin.
-  const workerURL =
-    new URL("./ffmpeg/worker.js", window.location.href).href;
+    const ffmpegModule=
+      await import(
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm"
+      );
 
-  await ffmpeg.load({
-    coreURL,
-    wasmURL,
-    workerURL
-  });
+    const utilModule=
+      await import(
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm"
+      );
 
-  ffmpegLoaded = true;
+    FFmpegClass=
+      ffmpegModule.FFmpeg;
+
+    fetchFile=
+      utilModule.fetchFile;
+
+    toBlobURL=
+      utilModule.toBlobURL;
+
+
+    ffmpeg=
+      new FFmpegClass();
+
+
+    ffmpeg.on(
+      "log",
+      ({message})=>{
+
+        console.log(
+          "[CozyOS FFmpeg]",
+          message
+        );
+
+      }
+    );
+
+
+    ffmpeg.on(
+      "progress",
+      ({progress})=>{
+
+        if(
+          progress>=0 &&
+          progress<=1
+        ){
+
+          $("progressFill")
+            .style
+            .width=
+              `${Math.round(
+                progress*100
+              )}%`;
+
+        }
+
+      }
+    );
+
+
+    const baseURL=
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+
+
+    /*
+     * V1.4.4:
+     * FFmpeg's wrapper worker is now hosted by CozyOS itself.
+     * This fixes the GitHub Pages cross-origin Worker restriction.
+     *
+     * classWorkerURL controls the Worker created by FFmpegClass.
+     * workerURL is NOT used here because it refers to the core's
+     * internal worker, not FFmpeg's wrapper worker.
+     */
+
+    const classWorkerURL=
+      new URL(
+        "./ffmpeg/worker.js",
+        window.location.href
+      ).href;
+
+
+    await ffmpeg.load({
+
+      classWorkerURL,
+
+      coreURL:
+        await toBlobURL(
+          `${baseURL}/ffmpeg-core.js`,
+          "text/javascript"
+        ),
+
+      wasmURL:
+        await toBlobURL(
+          `${baseURL}/ffmpeg-core.wasm`,
+          "application/wasm"
+        )
+
+    });
+
+
+    ffmpegLoaded=true;
+
+    hideModal();
+
+    return ffmpeg;
+
+  }
+  catch(error){
+
+    console.error(
+      "FFmpeg error:",
+      error
+    );
+
+    hideModal();
+
+    throw new Error(
+      "The MP4 engine could not be loaded."
+    );
+
+  }
+  finally{
+
+    ffmpegLoading=false;
+
+  }
+
 }
 
 
